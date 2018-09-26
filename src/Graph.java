@@ -1,6 +1,5 @@
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.lang.reflect.Array;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -66,9 +65,9 @@ public class Graph {
      * @param timeSlot 查询的时隙
      * @return 对应的节点集合
      */
-    private Set<Node> getNeighborsAtSlot(int id, int timeSlot) {
+    private Set<Node> getNeighborsAtSlot(int id, int timeSlot, List<Set<Integer>> tempAdjTable) {
         Set<Node> nodeSet = getActiveSlotNodeSet(timeSlot);
-        return nodeSet.stream().filter(node -> adjTable.get(id).contains(node.getId())).collect(Collectors.toSet());
+        return nodeSet.stream().filter(node -> tempAdjTable.get(id).contains(node.getId())).collect(Collectors.toSet());
     }
 
     /**
@@ -77,6 +76,11 @@ public class Graph {
      * @return 对应的节点集合
      */
     private Set<Node> getCoveringSlotNodeSet(int timeSlot) {
+        //拷贝邻接表，防止修改邻接关系时影响全局的邻接表
+        List<Set<Integer>> tempAdjTable = new ArrayList<>();
+        for (int i = 0; i < nodeCount; i++)
+            tempAdjTable.add(new HashSet<>(adjTable.get(i)));
+
         Set<Node> Ci = new HashSet<>();
         Set<Integer> S = new HashSet<>();
         Set<Node> P = getActiveSlotNodeSet(timeSlot);
@@ -84,44 +88,79 @@ public class Graph {
             S.add(i);
 
         int selectedId, maxArg;
-        Set<Node> selectedActiveNeighbors;
+        Set<Node> Niv;
         while (!P.isEmpty()) {
             selectedId = -1;
             maxArg = 0;
-            for (Integer i : S) {
+            for (Integer i : S)
                 //若selectedId未初始化，或新节点在当前时隙的邻节点数大于原节点，
                 //或新节点在当前时隙的邻节点数等于原节点但编号比原节点小，更新selectedId
-                if (selectedId == -1 || getNeighborsAtSlot(i, timeSlot).size() > maxArg || getNeighborsAtSlot(i, timeSlot).size() == maxArg && i < selectedId) {
+                if (selectedId == -1 || getNeighborsAtSlot(i, timeSlot, tempAdjTable).size() > maxArg || getNeighborsAtSlot(i, timeSlot, tempAdjTable).size() == maxArg && i < selectedId) {
                     selectedId = i;
-                    maxArg = getNeighborsAtSlot(selectedId, timeSlot).size();
+                    maxArg = getNeighborsAtSlot(selectedId, timeSlot, tempAdjTable).size();
                 }
-            }
-            selectedActiveNeighbors = getNeighborsAtSlot(selectedId, timeSlot);
+            Niv = getNeighborsAtSlot(selectedId, timeSlot, tempAdjTable);
             Ci.add(nodeList[selectedId]);//将当前选中的节点加入集合
             S.remove(selectedId);//将本次选中的节点从节点集合中移除
-            P.removeAll(selectedActiveNeighbors);//将本次选中节点的邻节点从当前时隙活跃节点集合中移除
+            P.removeAll(Niv);//将本次选中节点的邻节点从当前时隙活跃节点集合中移除
+            for (Set<Integer> set : tempAdjTable) //修改邻接表，将当前选中节点的覆盖节点从其他节点的邻接表中移除
+                for (Node n : Niv)
+                    set.remove(n.getId());
+            for (Node n : Niv) {//设置当前选中节点的覆盖节点的父节点和选中节点的覆盖集合
+                n.setParentId(selectedId);
+                nodeList[selectedId].getCoveringSet().add(n);
+            }
+            nodeList[selectedId].getTransSet().add(timeSlot);//将当前时隙加入选中节点的传输时隙集合
         }
         return Ci;
     }
 
     public static void main(String[] args) {
 
-//        Graph g = new Graph(20, 3);
-//
+        Graph g = new Graph(20, 3);
+
+        Set<Node> nodeSet = g.getCoveringSlotNodeSet(2);
+        for (Node n : nodeSet)
+            System.out.println(n.getId());
+        Set<Node> nodeSet1 = g.nodeList[9].getCoveringSet();
+        for (Node n : nodeSet1)
+            System.out.println(n.getId());
 //        Set<Integer> a = g.adjTable.get(5);
 //        for (Integer i : a)
 //            System.out.println(i + " " + g.nodeList[i].getActiveSlot());
 //        System.out.println();
-//        Set<Node> nodeSet = g.getNeighborsAtSlot(5,0);
+//        Set<Node> nodeSet = g.getCoveringSlotNodeSet(0);
 //        for (Node n : nodeSet)
 //            System.out.println(n.getId() + " " + n.getActiveSlot());
 //        System.out.println();
-        List<Node> a = new ArrayList<>();
-        a.add(new Node(1,1));
-        a.add(new Node(2,2));
-        List<Node> b = new ArrayList<>(a);
-        System.out.println(a);
-        System.out.println(b);
-        System.out.println();
+
+//        Set<Integer> s1 = new HashSet<>();
+//        s1.add(1);
+//        s1.add(2);
+//        s1.add(3);
+//        Set<Integer> s2 = new HashSet<>(s1);
+//        //s2.addAll(s1);
+//        System.out.println(s2);
+//        s1.remove(2);
+//        System.out.println(s1);
+//        System.out.println(s2);
+
+//        List<Set<Integer>> ls1 = new ArrayList<>();
+//        ls1.add(new HashSet<>());
+//        ls1.add(new HashSet<>());
+//        ls1.add(new HashSet<>());
+//        ls1.get(0).add(1);
+//        ls1.get(0).add(2);
+//        ls1.get(1).add(3);
+//        ls1.get(1).add(4);
+//        ls1.get(2).add(5);
+//        ls1.get(2).add(6);
+//
+//        List<Set<Integer>> ls2 = new ArrayList<>();
+//        ls2.add(new HashSet<>(ls1.get(0)));
+//        ls2.add(new HashSet<>(ls1.get(1)));
+//        ls2.get(0).remove(2);
+//        System.out.println(ls1.get(0));
+//        System.out.println(ls2.get(0));
     }
 }

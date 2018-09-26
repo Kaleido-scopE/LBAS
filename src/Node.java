@@ -1,3 +1,4 @@
+import java.util.HashSet;
 import java.util.Set;
 
 public class Node {
@@ -10,6 +11,8 @@ public class Node {
     public Node(Integer id, Integer activeSlot) {
         this.id = id;
         this.activeSlot = activeSlot;
+        transSet = new HashSet<>();
+        coveringSet = new HashSet<>();
     }
 
     public Integer getId() {
