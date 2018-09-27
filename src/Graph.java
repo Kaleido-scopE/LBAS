@@ -52,7 +52,22 @@ public class Graph {
      * 利用BFS计算各节点的层
      */
     private void calNodeLevel() {
+        int peek;
+        boolean[] visited = new boolean[nodeCount];
+        Queue<Integer> queue = new LinkedList<>();
 
+        nodeList[0].setLevel(0);//源点的层为0
+        visited[0] = true;
+        queue.offer(0);
+        while (!queue.isEmpty()) {
+            peek = queue.poll();
+            for (Integer i : adjTable.get(peek))
+                if (!visited[i]) {
+                    visited[i] = true;
+                    nodeList[i].setLevel(nodeList[peek].getLevel() + 1);
+                    queue.offer(i);
+                }
+        }
     }
 
     /**
@@ -128,48 +143,13 @@ public class Graph {
 
         Graph g = new Graph(20, 3);
 
-        Set<Node> nodeSet = g.getCoveringSlotNodeSet(2);
-        for (Node n : nodeSet)
-            System.out.println(n.getId());
-        Set<Node> nodeSet1 = g.nodeList[9].getCoveringSet();
-        for (Node n : nodeSet1)
-            System.out.println(n.getId());
-//        Set<Integer> a = g.adjTable.get(5);
-//        for (Integer i : a)
-//            System.out.println(i + " " + g.nodeList[i].getActiveSlot());
-//        System.out.println();
-//        Set<Node> nodeSet = g.getCoveringSlotNodeSet(0);
+        for (int i = 0; i < g.nodeCount; i++)
+            System.out.println(g.nodeList[i].getId() + " " + g.nodeList[i].getLevel());
+//        Set<Node> nodeSet = g.getCoveringSlotNodeSet(2);
 //        for (Node n : nodeSet)
-//            System.out.println(n.getId() + " " + n.getActiveSlot());
-//        System.out.println();
-
-//        Set<Integer> s1 = new HashSet<>();
-//        s1.add(1);
-//        s1.add(2);
-//        s1.add(3);
-//        Set<Integer> s2 = new HashSet<>(s1);
-//        //s2.addAll(s1);
-//        System.out.println(s2);
-//        s1.remove(2);
-//        System.out.println(s1);
-//        System.out.println(s2);
-
-//        List<Set<Integer>> ls1 = new ArrayList<>();
-//        ls1.add(new HashSet<>());
-//        ls1.add(new HashSet<>());
-//        ls1.add(new HashSet<>());
-//        ls1.get(0).add(1);
-//        ls1.get(0).add(2);
-//        ls1.get(1).add(3);
-//        ls1.get(1).add(4);
-//        ls1.get(2).add(5);
-//        ls1.get(2).add(6);
-//
-//        List<Set<Integer>> ls2 = new ArrayList<>();
-//        ls2.add(new HashSet<>(ls1.get(0)));
-//        ls2.add(new HashSet<>(ls1.get(1)));
-//        ls2.get(0).remove(2);
-//        System.out.println(ls1.get(0));
-//        System.out.println(ls2.get(0));
+//            System.out.println(n.getId());
+//        Set<Node> nodeSet1 = g.nodeList[9].getCoveringSet();
+//        for (Node n : nodeSet1)
+//            System.out.println(n.getId());
     }
 }
