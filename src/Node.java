@@ -5,12 +5,15 @@ public class Node {
     private Integer id;//节点编号
     private Integer parentId;//父节点编号
     private Integer activeSlot;//活跃时隙
+    private Integer level;//节点所在层数
+    private Integer covNodeId;//覆盖当前节点的节点编号
     private Set<Integer> transSet;//传输时隙集合
     private Set<Node> coveringSet;//覆盖节点集合
 
     public Node(Integer id, Integer activeSlot) {
         this.id = id;
         this.activeSlot = activeSlot;
+        parentId = -1;
         transSet = new HashSet<>();
         coveringSet = new HashSet<>();
     }
@@ -37,6 +40,22 @@ public class Node {
 
     public void setActiveSlot(Integer activeSlot) {
         this.activeSlot = activeSlot;
+    }
+
+    public Integer getLevel() {
+        return level;
+    }
+
+    public void setLevel(Integer level) {
+        this.level = level;
+    }
+
+    public Integer getCovNodeId() {
+        return covNodeId;
+    }
+
+    public void setCovNodeId(Integer covNodeId) {
+        this.covNodeId = covNodeId;
     }
 
     public Set<Integer> getTransSet() {

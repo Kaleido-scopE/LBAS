@@ -41,9 +41,18 @@ public class Graph {
                 adjTable.get(s).add(e);
                 adjTable.get(e).add(s);
             }
+
+            calNodeLevel();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 利用BFS计算各节点的层
+     */
+    private void calNodeLevel() {
+
     }
 
     /**
@@ -106,8 +115,8 @@ public class Graph {
             for (Set<Integer> set : tempAdjTable) //修改邻接表，将当前选中节点的覆盖节点从其他节点的邻接表中移除
                 for (Node n : Niv)
                     set.remove(n.getId());
-            for (Node n : Niv) {//设置当前选中节点的覆盖节点的父节点和选中节点的覆盖集合
-                n.setParentId(selectedId);
+            for (Node n : Niv) {//设置被覆盖节点的CovNode和选中节点的覆盖集合
+                n.setCovNodeId(selectedId);
                 nodeList[selectedId].getCoveringSet().add(n);
             }
             nodeList[selectedId].getTransSet().add(timeSlot);//将当前时隙加入选中节点的传输时隙集合
