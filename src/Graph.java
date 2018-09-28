@@ -6,12 +6,16 @@ import java.util.stream.Collectors;
 public class Graph {
     private Integer nodeCount;//网络节点数
     private Integer slotCount;//单周期时隙数
+    private Integer maxLevel;//图的最大层数
     private Node[] nodeList;//节点集合，编号为0的节点表示Source，其活跃时隙取-1
     private List<Set<Integer>> adjTable;//描述图拓扑结构的邻接表，adjTable(i)表示编号为i的邻接点编号集合
+    private Set<Integer> backbone;//广播骨架节点编号集合
 
     public Graph(Integer nodeCount, Integer slotCount) {
         this.nodeCount = nodeCount;
         this.slotCount = slotCount;
+        backbone = new HashSet<>();
+        maxLevel = 0;
         init();
     }
 
@@ -64,7 +68,10 @@ public class Graph {
             for (Integer i : adjTable.get(peek))
                 if (!visited[i]) {
                     visited[i] = true;
+                    nodeList[i].setParentId(peek);//为每个节点设置初始的父节点
                     nodeList[i].setLevel(nodeList[peek].getLevel() + 1);
+                    if (nodeList[i].getLevel() > maxLevel)//计算出图的最大层数
+                        maxLevel = nodeList[i].getLevel();
                     queue.offer(i);
                 }
         }
@@ -139,12 +146,98 @@ public class Graph {
         return Ci;
     }
 
+    /**
+     * 获得指定层的覆盖节点集合，需要在计算完所有时隙的覆盖节点后才能调用
+     * @param level 指定的层数
+     * @return 对应的节点集合
+     */
+    private Set<Node> getLevelBasedSet(int level) {
+        Set<Node> nodeSet = new HashSet<>();
+
+        //用节点的覆盖集合是否非空判断其是否是覆盖节点，用节点所在层判断是否需要加入返回值集合
+        for (int i = 0; i < nodeCount; i++)
+            if (nodeList[i].getLevel() == level && !nodeList[i].getCoveringSet().isEmpty())
+                nodeSet.add(nodeList[i]);
+        return nodeSet;
+    }
+
+    /**
+     * 将节点v加入广播主干
+     * @param vId 表示待加入节点v
+     * @param uId 可能存在的v的前驱
+     */
+    private void addToBackBone(int vId, int uId) {
+        backbone.add(vId);
+        if (uId != -1) {
+            nodeList[vId].setParentId(uId);
+            nodeList[vId].setRootId(nodeList[uId].getRootId());
+        }
+    }
+
+    /**
+     * 自上而下遍历，将各覆盖节点加入广播主干，并建立数棵覆盖子树
+     */
+    private void constructSubTrees() {
+        //列表中第i个集合对应第i个时隙的覆盖节点集合
+        //同时可以计算各节点的覆盖节点
+        List<Set<Node>> coveringNodeSetList = new ArrayList<>();
+        for (int i = 0; i < slotCount; i++)
+            coveringNodeSetList.add(getCoveringSlotNodeSet(i));
+        Node u;
+        Set<Node> Sl;
+
+        backbone.add(0);//将源点加入广播骨架
+
+        //遍历所有层的覆盖节点集合
+        for (int i = 1; i <= maxLevel; i++) {
+            Sl = getLevelBasedSet(i);
+            for (Node v :Sl)
+                if (v.getRootId().intValue() != v.getId().intValue()) {
+                    u = nodeList[v.getCovNodeId()];
+                    if (u.getLevel().intValue() < v.getLevel().intValue())//Case 1.1
+                        addToBackBone(v.getId(), u.getId());
+                    else if (u.getLevel().intValue() == v.getLevel().intValue()) {
+                        if (u.getRootId() == -1) {
+                            if (v.getId().intValue() == u.getCovNodeId().intValue()) {//Case 1.2 & Case 1.3
+                                //选择具有更多邻节点的那个作为新的根；若邻节点数相同，选择Id较小的
+                                if (adjTable.get(v.getId()).size() > adjTable.get(u.getId()).size())
+                                    u = v;
+                                else if (adjTable.get(v.getId()).size() == adjTable.get(u.getId()).size())
+                                    u = (u.getId() < v.getId()) ? u : v;
+                            }
+                            u.setRootId(u.getId());
+                            addToBackBone(u.getId(), -1);
+                        }
+                        addToBackBone(v.getId(), u.getId());
+                    }
+                    else
+                        addToBackBone(v.getId(), -1);
+                    //remove
+                }
+        }
+    }
+
     public static void main(String[] args) {
 
-        Graph g = new Graph(20, 3);
+//        Graph g = new Graph(20, 3);
+//        g.getCoveringSlotNodeSet(0);
+//        g.getCoveringSlotNodeSet(1);
+//        g.getCoveringSlotNodeSet(2);
+        Set<Integer> s = new HashSet<>();
+        s.add(1);
+        s.add(2);
+        s.add(3);
+        for (Integer i : s)
+            if (i == 2)
+                s.remove(i);
+        System.out.println(s);
+//        for (int i = 0; i < g.nodeCount; i++)
+//            System.out.println(g.nodeList[i].getId() + " " + g.nodeList[i].getCovNodeId());
 
-        for (int i = 0; i < g.nodeCount; i++)
-            System.out.println(g.nodeList[i].getId() + " " + g.nodeList[i].getLevel());
+//        Set<Node> set = g.getLevelBasedSet(5);
+//        for (Node n : set)
+//            System.out.println(n.getId());
+
 //        Set<Node> nodeSet = g.getCoveringSlotNodeSet(2);
 //        for (Node n : nodeSet)
 //            System.out.println(n.getId());
