@@ -11,12 +11,14 @@ public class Graph {
     private List<Set<Integer>> adjTable;//描述图拓扑结构的邻接表，adjTable(i)表示编号为i的邻接点编号集合
     private Set<Integer> backbone;//广播骨架节点编号集合
 
-    public Graph(Integer nodeCount, Integer slotCount) {
+    private Graph(Integer nodeCount, Integer slotCount) {
         this.nodeCount = nodeCount;
         this.slotCount = slotCount;
         backbone = new HashSet<>();
         maxLevel = 0;
         init();
+        transformTopology();
+        calNodeLevel();
     }
 
     private void init() {
@@ -46,10 +48,28 @@ public class Graph {
                 adjTable.get(e).add(s);
             }
 
-            calNodeLevel();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 变换图的拓扑结构，将每个节点和其两跳节点相连
+     */
+    private void transformTopology() {
+        List<Set<Integer>> tempAdjTable = new ArrayList<>();
+        for (int i = 0; i < nodeCount; i++)
+            tempAdjTable.add(new HashSet<>(adjTable.get(i)));
+        Set<Integer> curNeighbors;
+
+        for (int i = 0; i < nodeCount; i++) {
+            curNeighbors = adjTable.get(i);
+            for (Integer j : curNeighbors)
+                tempAdjTable.get(i).addAll(adjTable.get(j));
+            tempAdjTable.get(i).remove(i);
+        }
+
+        adjTable = tempAdjTable;
     }
 
     /**
@@ -223,7 +243,7 @@ public class Graph {
 
     /**
      * 完成Stage1后，调用此方法获得所有的覆盖子树的根节点
-     * @return 根节点列表，按所在层数由大到小排列
+     * @return 根节点列表，按所在层数由低到高排列
      */
     private List<Node> getRootNodes() {
         List<Node> nodes = new ArrayList<>();
@@ -270,15 +290,16 @@ public class Graph {
                 v.setParentId(v.getCovNodeId());
             else {
                 neighbors = adjTable.get(v.getId());
-                for (Integer c : neighbors)
+                for (Integer c : neighbors) {
                     //Case 2.2 在v的邻节点中选择，其满足以下条件之一：
                     //1. 已经在主干中，且其根节点所在层比v低
                     //2. 覆盖它的节点所在子树的根节点所在层比v低
                     if (backbone.contains(c) && nodeList[nodeList[c].getRootId()].getLevel() < v.getLevel() ||
-                        nodeList[nodeList[nodeList[c].getCovNodeId()].getRootId()].getLevel() < v.getLevel()) {
+                            nodeList[nodeList[nodeList[c].getCovNodeId()].getRootId()].getLevel() < v.getLevel()) {
                         selectedC = c;
                         break;
                     }
+                }
                 if (selectedC != -1) {
                     v.setParentId(selectedC);
                     addToBackBone2(selectedC, nodeList[selectedC].getCovNodeId(), v.getActiveSlot());
@@ -295,15 +316,29 @@ public class Graph {
         }
     }
 
+    private int calTotalTrans() {
+        //finalizeBackbone();
+        int cnt = 0;
+        for (Integer i : backbone)
+            cnt += nodeList[i].getTransSet().size();
+        return cnt;
+    }
+
     public static void main(String[] args) {
 
         Graph g = new Graph(20, 3);
 
+        for (Node n : g.nodeList)
+            System.out.println(n.getId()+ " " + n.getActiveSlot() + " " + g.adjTable.get(n.getId()));
+
+
         g.finalizeBackbone();
+
+        System.out.println();
         for (Integer i : g.backbone)
-            System.out.println(i + " " + g.nodeList[i].getParentId() + " " + g.nodeList[i].getRootId() + " " + g.nodeList[i].getLevel());
+            System.out.println(i + " " + g.nodeList[i].getParentId() + " " + g.nodeList[i].getRootId() + " " + g.nodeList[i].getTransSet() + " " + g.nodeList[i].getActiveSlot());
 
-
+        System.out.println("Total Transmission: " + g.calTotalTrans());
 //        for (int i = 0; i < g.nodeCount; i++)
 //            System.out.println(g.nodeList[i].getId() + " " + g.nodeList[i].getCovNodeId());
 
