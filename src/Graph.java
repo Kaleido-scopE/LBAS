@@ -169,9 +169,13 @@ public class Graph {
     private void addToBackBone(int vId, int uId) {
         backbone.add(vId);
         if (uId != -1) {
-            nodeList[vId].setParentId(uId);
-            nodeList[vId].setRootId(nodeList[uId].getRootId());
+            if (vId != uId) {
+                nodeList[vId].setParentId(uId);
+                nodeList[vId].setRootId(nodeList[uId].getRootId());
+            }
         }
+        else
+            nodeList[vId].setRootId(vId);
     }
 
     /**
@@ -186,7 +190,7 @@ public class Graph {
         Node u;
         Set<Node> Sl;
 
-        backbone.add(0);//将源点加入广播骨架
+        addToBackBone(0, -1);//将源点加入广播骨架
 
         //遍历所有层的覆盖节点集合
         for (int i = 1; i <= maxLevel; i++) {
@@ -217,20 +221,89 @@ public class Graph {
         }
     }
 
+    /**
+     * 完成Stage1后，调用此方法获得所有的覆盖子树的根节点
+     * @return 根节点列表，按所在层数由大到小排列
+     */
+    private List<Node> getRootNodes() {
+        List<Node> nodes = new ArrayList<>();
+        for (Integer i : backbone)
+            if (nodeList[i].getRootId().equals(i) && i != 0)//不需要加入source
+                nodes.add(nodeList[i]);
+        Collections.sort(nodes, new Comparator<Node>() {
+            @Override
+            public int compare(Node o1, Node o2) {
+                return o2.getLevel().compareTo(o1.getLevel());
+            }
+        });
+        return nodes;
+    }
+
+    /**
+     * 将节点x加入广播主干，并附加一个传输时隙t
+     * @param xId 新加入的节点
+     * @param pId 节点x的前驱
+     * @param t 节点x新增的传输时隙
+     */
+    private void addToBackBone2(int xId, int pId, int t) {
+        if (!backbone.contains(xId)) {
+            backbone.add(xId);
+            nodeList[xId].setParentId(pId);
+            nodeList[xId].setRootId(nodeList[pId].getRootId());
+        }
+        nodeList[xId].getTransSet().add(t);
+    }
+
+    /**
+     * 自下而上遍历所有覆盖子树根节点，并将各子树连接，完成广播主干
+     */
+    private void finalizeBackbone() {
+        constructSubTrees();
+        List<Node> rootNodes = getRootNodes();
+        int covRoot, selectedC = -1;
+        int P, grandP;
+        Set<Integer> neighbors;
+
+        for (Node v : rootNodes) {
+            covRoot = nodeList[v.getCovNodeId()].getRootId();
+            if (nodeList[covRoot].getLevel().intValue() < v.getLevel().intValue())//Case 2.1
+                v.setParentId(v.getCovNodeId());
+            else {
+                neighbors = adjTable.get(v.getId());
+                for (Integer c : neighbors)
+                    //Case 2.2 在v的邻节点中选择，其满足以下条件之一：
+                    //1. 已经在主干中，且其根节点所在层比v低
+                    //2. 覆盖它的节点所在子树的根节点所在层比v低
+                    if (backbone.contains(c) && nodeList[nodeList[c].getRootId()].getLevel() < v.getLevel() ||
+                        nodeList[nodeList[nodeList[c].getCovNodeId()].getRootId()].getLevel() < v.getLevel()) {
+                        selectedC = c;
+                        break;
+                    }
+                if (selectedC != -1) {
+                    v.setParentId(selectedC);
+                    addToBackBone2(selectedC, nodeList[selectedC].getCovNodeId(), v.getActiveSlot());
+                    selectedC = -1;
+                }
+                else {
+                    P = v.getParentId();
+                    grandP = nodeList[P].getParentId();
+                    addToBackBone2(grandP, nodeList[grandP].getCovNodeId(), nodeList[P].getActiveSlot());
+                    addToBackBone2(P, grandP, v.getActiveSlot());
+                }
+            }
+            v.setRootId(nodeList[v.getParentId()].getRootId());
+        }
+    }
+
     public static void main(String[] args) {
 
-//        Graph g = new Graph(20, 3);
-//        g.getCoveringSlotNodeSet(0);
-//        g.getCoveringSlotNodeSet(1);
-//        g.getCoveringSlotNodeSet(2);
-        Set<Integer> s = new HashSet<>();
-        s.add(1);
-        s.add(2);
-        s.add(3);
-        for (Integer i : s)
-            if (i == 2)
-                s.remove(i);
-        System.out.println(s);
+        Graph g = new Graph(20, 3);
+
+        g.finalizeBackbone();
+        for (Integer i : g.backbone)
+            System.out.println(i + " " + g.nodeList[i].getParentId() + " " + g.nodeList[i].getRootId() + " " + g.nodeList[i].getLevel());
+
+
 //        for (int i = 0; i < g.nodeCount; i++)
 //            System.out.println(g.nodeList[i].getId() + " " + g.nodeList[i].getCovNodeId());
 
