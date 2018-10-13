@@ -17,7 +17,7 @@ public class Graph {
         backbone = new HashSet<>();
         maxLevel = 0;
         init();
-        transformTopology();
+        //transformTopology();
         calNodeLevel();
     }
 
@@ -316,12 +316,23 @@ public class Graph {
         }
     }
 
+    /**
+     * 计算广播所用的传输次数之和，在调用finalizeBackbone后才能使用
+     * @return 传输次数之和
+     */
     private int calTotalTrans() {
-        //finalizeBackbone();
         int cnt = 0;
         for (Integer i : backbone)
             cnt += nodeList[i].getTransSet().size();
         return cnt;
+    }
+
+    /**
+     * 计算广播所用的延迟，即从开始广播到消息传送到网络中每个节点所用的总时隙数，在调用finalizeBackbone后才能使用
+     * @return 本次广播所花费的总时隙
+     */
+    private int calTransDelay(){
+
     }
 
     public static void main(String[] args) {
@@ -331,7 +342,6 @@ public class Graph {
         for (Node n : g.nodeList)
             System.out.println(n.getId()+ " " + n.getActiveSlot() + " " + g.adjTable.get(n.getId()));
 
-
         g.finalizeBackbone();
 
         System.out.println();
@@ -339,18 +349,5 @@ public class Graph {
             System.out.println(i + " " + g.nodeList[i].getParentId() + " " + g.nodeList[i].getRootId() + " " + g.nodeList[i].getTransSet() + " " + g.nodeList[i].getActiveSlot());
 
         System.out.println("Total Transmission: " + g.calTotalTrans());
-//        for (int i = 0; i < g.nodeCount; i++)
-//            System.out.println(g.nodeList[i].getId() + " " + g.nodeList[i].getCovNodeId());
-
-//        Set<Node> set = g.getLevelBasedSet(5);
-//        for (Node n : set)
-//            System.out.println(n.getId());
-
-//        Set<Node> nodeSet = g.getCoveringSlotNodeSet(2);
-//        for (Node n : nodeSet)
-//            System.out.println(n.getId());
-//        Set<Node> nodeSet1 = g.nodeList[9].getCoveringSet();
-//        for (Node n : nodeSet1)
-//            System.out.println(n.getId());
     }
 }
