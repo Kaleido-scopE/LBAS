@@ -328,25 +328,79 @@ public class Graph {
     }
 
     /**
+     * 求广播主干中给定节点的子节点集合
+     * @param id 给定的节点id
+     * @return 子节点id集合
+     */
+    private Set<Integer> getChildSet(int id) {
+        Set<Integer> childSet = new HashSet<>();
+        for (Integer i : backbone)
+            if (nodeList[i].getParentId() == id)
+                childSet.add(i);
+        return childSet;
+    }
+
+    /**
      * 计算广播所用的延迟，即从开始广播到消息传送到网络中每个节点所用的总时隙数，在调用finalizeBackbone后才能使用
      * @return 本次广播所花费的总时隙
      */
-    private int calTransDelay(){
+    private int calTransDelay() {
+        int[] reachTime = new int[nodeCount];
+        for (int i = 0; i < reachTime.length; i++)
+            reachTime[i] = 0x3f3f3f3f;//初始化每个节点的到达时间为INF
 
+        int currentNode, currentTime, maxTime = -1;
+        Set<Integer> childSet, neighborSet;
+        Queue<Integer> queue = new LinkedList<>();
+        reachTime[0] = 0;//源节点的到达时间为0
+        queue.offer(0);
+
+        while (!queue.isEmpty()) {
+            currentNode = queue.poll();
+            childSet = getChildSet(currentNode);
+            neighborSet = adjTable.get(currentNode);
+
+            for (Integer slot : nodeList[currentNode].getTransSet())
+                for (Integer neighborId : neighborSet)
+                    if (nodeList[neighborId].getActiveSlot() == slot) {
+                        currentTime = reachTime[currentNode] + slot - reachTime[currentNode] % slotCount;
+                        if (reachTime[currentNode] % slotCount >= slot) {
+                            currentTime += slotCount;
+                            if (currentNode == 0)
+                                currentTime -= slotCount;
+                        }
+                        if (reachTime[neighborId] > currentTime)
+                            reachTime[neighborId] = currentTime;
+                    }
+
+            for (Integer childId : childSet)
+                queue.offer(childId);
+        }
+
+        for (int time : reachTime)
+            if (time > maxTime)
+                maxTime = time;
+
+        return maxTime;
     }
 
     public static void main(String[] args) {
 
         Graph g = new Graph(20, 3);
-
-        for (Node n : g.nodeList)
-            System.out.println(n.getId()+ " " + n.getActiveSlot() + " " + g.adjTable.get(n.getId()));
-
         g.finalizeBackbone();
 
+        for (Node n : g.nodeList)
+            System.out.println(n.getId()+ " " + n.getCovNodeId() + " " + n.getActiveSlot());
+
         System.out.println();
-        for (Integer i : g.backbone)
-            System.out.println(i + " " + g.nodeList[i].getParentId() + " " + g.nodeList[i].getRootId() + " " + g.nodeList[i].getTransSet() + " " + g.nodeList[i].getActiveSlot());
+        for (Integer i : g.backbone) {
+            System.out.print(i + " " + g.nodeList[i].getParentId() + " " + g.nodeList[i].getTransSet() + " [");
+            for (Node n : g.nodeList[i].getCoveringSet())
+                System.out.print(n.getId() + ",");
+            System.out.println("]");
+        }
+
+        g.calTransDelay();
 
         System.out.println("Total Transmission: " + g.calTotalTrans());
     }
