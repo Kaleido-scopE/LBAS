@@ -11,9 +11,7 @@ public class Graph {
     private List<Set<Integer>> adjTable;//描述图拓扑结构的邻接表，adjTable(i)表示编号为i的邻接点编号集合
     private Set<Integer> backbone;//广播骨架节点编号集合
 
-    private Graph(Integer nodeCount, Integer slotCount) {
-        this.nodeCount = nodeCount;
-        this.slotCount = slotCount;
+    private Graph() {
         backbone = new HashSet<>();
         maxLevel = 0;
         init();
@@ -22,13 +20,18 @@ public class Graph {
     }
 
     private void init() {
-        nodeList = new Node[nodeCount];
-        adjTable = new ArrayList<>();
-        for (int i = 0; i < nodeCount; i++)
-            adjTable.add(new HashSet<>());
-
         try {
             Scanner sc = new Scanner(new FileInputStream("./test_data(origin).txt"));
+
+            //输入节点数和时隙数
+            nodeCount = sc.nextInt();
+            slotCount = sc.nextInt();
+
+            //初始化节点列表和邻接表
+            nodeList = new Node[nodeCount];
+            adjTable = new ArrayList<>();
+            for (int i = 0; i < nodeCount; i++)
+                adjTable.add(new HashSet<>());
 
             //输入各节点的编号及活跃时隙
             int id, activeSlot;
@@ -135,7 +138,7 @@ public class Graph {
         Set<Node> Ci = new HashSet<>();
         Set<Integer> S = new HashSet<>();
         Set<Node> P = getActiveSlotNodeSet(timeSlot);
-        for (int i = 1; i < nodeCount; i++)
+        for (int i = 0; i < nodeCount; i++)//源点不会被覆盖，但可以覆盖其他节点
             S.add(i);
 
         int selectedId, maxArg;
@@ -360,6 +363,7 @@ public class Graph {
             childSet = getChildSet(currentNode);
             neighborSet = adjTable.get(currentNode);
 
+            //当某节点在某个自己的传输时隙中广播时，注意到其邻节点中所有在当前时隙活跃的节点都能接收到信息，而不只是其覆盖节点
             for (Integer slot : nodeList[currentNode].getTransSet())
                 for (Integer neighborId : neighborSet)
                     if (nodeList[neighborId].getActiveSlot() == slot) {
@@ -386,22 +390,26 @@ public class Graph {
 
     public static void main(String[] args) {
 
-        Graph g = new Graph(20, 3);
+        Graph g = new Graph();
+
         g.finalizeBackbone();
 
+        System.out.println("Id\tCovNodeId\tActiveSlot");
         for (Node n : g.nodeList)
-            System.out.println(n.getId()+ " " + n.getCovNodeId() + " " + n.getActiveSlot());
+            System.out.println(n.getId()+ "\t" + n.getCovNodeId() + "\t" + n.getActiveSlot());
 
         System.out.println();
+        System.out.println("Backbone:");
+        System.out.println("Id\tParent\tTransSet\tCoveringSet");
         for (Integer i : g.backbone) {
-            System.out.print(i + " " + g.nodeList[i].getParentId() + " " + g.nodeList[i].getTransSet() + " [");
+            System.out.print(i + "\t" + g.nodeList[i].getParentId() + "\t" + g.nodeList[i].getTransSet() + "\t[");
             for (Node n : g.nodeList[i].getCoveringSet())
                 System.out.print(n.getId() + ",");
             System.out.println("]");
         }
 
-        g.calTransDelay();
-
+        System.out.println();
+        System.out.println("TransDelay: " + g.calTransDelay());
         System.out.println("Total Transmission: " + g.calTotalTrans());
     }
 }
