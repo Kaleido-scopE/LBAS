@@ -1,3 +1,5 @@
+package com.noah;
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.*;
@@ -21,7 +23,7 @@ public class Graph {
 
     private void init() {
         try {
-            Scanner sc = new Scanner(new FileInputStream("./test_data(origin).txt"));
+            Scanner sc = new Scanner(new FileInputStream("./src/main/resources/test_data(origin).txt"));
 
             //输入节点数和时隙数
             nodeCount = sc.nextInt();
