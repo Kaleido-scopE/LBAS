@@ -16,65 +16,10 @@ public class Graph {
     private Graph() {
         backbone = new HashSet<>();
         maxLevel = 0;
-        init();
+        //manuallyInit();
+        autoInit(35,4,40);
         //transformTopology();
         calNodeLevel();
-    }
-
-    private void init() {
-        try {
-            Scanner sc = new Scanner(new FileInputStream("./src/main/resources/test_data(origin).txt"));
-
-            //输入节点数和时隙数
-            nodeCount = sc.nextInt();
-            slotCount = sc.nextInt();
-
-            //初始化节点列表和邻接表
-            nodeList = new Node[nodeCount];
-            adjTable = new ArrayList<>();
-            for (int i = 0; i < nodeCount; i++)
-                adjTable.add(new HashSet<>());
-
-            //输入各节点的编号及活跃时隙
-            int id, activeSlot;
-            for (int i = 0; i < nodeCount; i++) {
-                id = sc.nextInt();
-                activeSlot = sc.nextInt();
-                nodeList[id] = new Node(id, activeSlot);
-            }
-
-            //输入图的拓扑结构
-            int s, e, eNum;
-            eNum = sc.nextInt();//图的边数
-            for (int i = 0; i < eNum; i++) {
-                s = sc.nextInt();
-                e = sc.nextInt();
-                adjTable.get(s).add(e);
-                adjTable.get(e).add(s);
-            }
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * 变换图的拓扑结构，将每个节点和其两跳节点相连
-     */
-    private void transformTopology() {
-        List<Set<Integer>> tempAdjTable = new ArrayList<>();
-        for (int i = 0; i < nodeCount; i++)
-            tempAdjTable.add(new HashSet<>(adjTable.get(i)));
-        Set<Integer> curNeighbors;
-
-        for (int i = 0; i < nodeCount; i++) {
-            curNeighbors = adjTable.get(i);
-            for (Integer j : curNeighbors)
-                tempAdjTable.get(i).addAll(adjTable.get(j));
-            tempAdjTable.get(i).remove(i);
-        }
-
-        adjTable = tempAdjTable;
     }
 
     /**
@@ -321,6 +266,120 @@ public class Graph {
         }
     }
 
+//=====================================模拟结果测试函数========================================
+    /**
+     * 手动输入拓扑
+     */
+    private void manuallyInit() {
+        try {
+            Scanner sc = new Scanner(new FileInputStream("./src/main/resources/test_data(origin).txt"));
+
+            //输入节点数和时隙数
+            nodeCount = sc.nextInt();
+            slotCount = sc.nextInt();
+
+            //初始化节点列表和邻接表
+            nodeList = new Node[nodeCount];
+            adjTable = new ArrayList<>();
+            for (int i = 0; i < nodeCount; i++)
+                adjTable.add(new HashSet<>());
+
+            //输入各节点的编号及活跃时隙
+            int id, activeSlot;
+            for (int i = 0; i < nodeCount; i++) {
+                id = sc.nextInt();
+                activeSlot = sc.nextInt();
+                nodeList[id] = new Node(id, activeSlot);
+            }
+
+            //输入图的拓扑结构
+            int s, e, eNum;
+            eNum = sc.nextInt();//图的边数
+            for (int i = 0; i < eNum; i++) {
+                s = sc.nextInt();
+                e = sc.nextInt();
+                adjTable.get(s).add(e);
+                adjTable.get(e).add(s);
+            }
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 随机生成图的拓扑结构（基于LBAS的一跳模型）
+     * @param nodeNum 需要生成的节点数
+     * @param slotNum 当前图每个周期中的时隙数
+     * @param additionalEdgeNum 最少生成的边数
+     */
+    private void autoInit(int nodeNum, int slotNum, int additionalEdgeNum) {
+        Random random = new Random(System.currentTimeMillis());
+
+        nodeCount = nodeNum;
+        slotCount = slotNum;
+
+        //初始化节点列表和邻接表
+        nodeList = new Node[nodeCount];
+        adjTable = new ArrayList<>();
+        for (int i = 0; i < nodeCount; i++)
+            adjTable.add(new HashSet<>());
+
+        //初始化节点，节点编号为 0 ~ (nodeNum-1)
+        nodeList[0] = new Node(0, -1);//0号节点为Source
+        for (int i = 1; i < nodeCount; i++)
+            nodeList[i] = new Node(i, random.nextInt(slotCount));
+
+        //为了保证图的连通性，首先随机创建一颗生成树
+        Set<Integer> U = new HashSet<>();//U中保存了已加入生成树的节点
+        Set<Integer> V = new HashSet<>();//V中保存了未加入生成树的节点
+        U.add(0);//为U指定一个初始节点
+        for (int i = 1; i < nodeCount; i++)
+            V.add(i);
+
+        int s, e;
+        while (!V.isEmpty()) {
+            s = (int) U.toArray()[random.nextInt(U.size())];//从U中随机取一个节点
+            e = (int) V.toArray()[random.nextInt(V.size())];//从V中随机取一个节点
+
+            V.remove(e);
+            U.add(e);
+
+            adjTable.get(s).add(e);
+            adjTable.get(e).add(s);
+        }
+
+        //额外生成additionalEdgeNum条边
+        for (int i = 0; i < additionalEdgeNum; i++) {
+            do {
+                s = random.nextInt(nodeCount);
+                e = random.nextInt(nodeCount);
+            } while (s == e || adjTable.get(s).contains(e));//当生成的起点和终点相同，或边已存在，则重新生成起点和终点
+            adjTable.get(s).add(e);
+            adjTable.get(e).add(s);
+        }
+    }
+
+    /**
+     * 变换图的拓扑结构，将每个节点和其两跳节点相连
+     */
+    private void transformTopology() {
+        List<Set<Integer>> tempAdjTable = new ArrayList<>();
+        for (int i = 0; i < nodeCount; i++)
+            tempAdjTable.add(new HashSet<>(adjTable.get(i)));
+        Set<Integer> curNeighbors;
+
+        for (int i = 0; i < nodeCount; i++) {
+            curNeighbors = adjTable.get(i);
+            for (Integer j : curNeighbors)
+                tempAdjTable.get(i).addAll(adjTable.get(j));
+            tempAdjTable.get(i).remove(i);
+        }
+
+        adjTable = tempAdjTable;
+    }
+
+
     /**
      * 计算广播所用的传输次数之和，在调用finalizeBackbone后才能使用
      * @return 传输次数之和
@@ -385,33 +444,41 @@ public class Graph {
 
         for (int time : reachTime)
             if (time > maxTime)
-                maxTime = time;
+                maxTime = time;//本短点可查看消息传送到各节点的时间
 
         return maxTime;
     }
 
-    public static void main(String[] args) {
-
-        Graph g = new Graph();
-
-        g.finalizeBackbone();
-
+    /**
+     * 输出当前拓扑各计算过程的详细信息
+     */
+    private void getDetailedInfo() {
+        finalizeBackbone();
         System.out.println("Id\tCovNodeId\tActiveSlot");
-        for (Node n : g.nodeList)
+        for (Node n : nodeList)
             System.out.println(n.getId()+ "\t" + n.getCovNodeId() + "\t" + n.getActiveSlot());
 
         System.out.println();
         System.out.println("Backbone:");
         System.out.println("Id\tParent\tTransSet\tCoveringSet");
-        for (Integer i : g.backbone) {
-            System.out.print(i + "\t" + g.nodeList[i].getParentId() + "\t" + g.nodeList[i].getTransSet() + "\t[");
-            for (Node n : g.nodeList[i].getCoveringSet())
+        for (Integer i : backbone) {
+            System.out.print(i + "\t" + nodeList[i].getParentId() + "\t" + nodeList[i].getTransSet() + "\t[");
+            for (Node n : nodeList[i].getCoveringSet())
                 System.out.print(n.getId() + ",");
             System.out.println("]");
         }
 
         System.out.println();
-        System.out.println("TransDelay: " + g.calTransDelay());
-        System.out.println("Total Transmission: " + g.calTotalTrans());
+        System.out.println("TransDelay: " + calTransDelay());
+        System.out.println("Total Transmission: " + calTotalTrans());
+        System.out.println();
+    }
+
+
+
+
+    public static void main(String[] args) {
+        Graph g = new Graph();
+        g.getDetailedInfo();
     }
 }
