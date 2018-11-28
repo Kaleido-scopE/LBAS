@@ -16,10 +16,9 @@ public class Graph {
     private Graph() {
         backbone = new HashSet<>();
         maxLevel = 0;
-        manuallyInit();
-        //autoInit(35,4,40);
+        //manuallyInit();
+        autoInit(20,5,0);
         //transformTopology();
-        calNodeLevel();
     }
 
     /**
@@ -152,6 +151,9 @@ public class Graph {
      * 自上而下遍历，将各覆盖节点加入广播主干，并建立数棵覆盖子树
      */
     private void constructSubTrees() {
+        //初始化各节点的层
+        calNodeLevel();
+
         //列表中第i个集合对应第i个时隙的覆盖节点集合
         //同时可以计算各节点的覆盖节点
         List<Set<Node>> coveringNodeSetList = new ArrayList<>();
@@ -361,9 +363,27 @@ public class Graph {
     }
 
     /**
+     * 原图计算完成后，调用变换拓扑函数前，需要调用该函数初始化各节点的所有数据结构
+     */
+    private void initState() {
+        maxLevel = 0;
+        backbone.clear();
+        for (int i = 0; i < nodeCount; i++) {
+            nodeList[i].setParentId(-1);
+            nodeList[i].setRootId(-1);
+            nodeList[i].setCovNodeId(-1);
+            nodeList[i].getTransSet().clear();
+            nodeList[i].getCoveringSet().clear();
+        }
+    }
+
+    /**
      * 变换图的拓扑结构，将每个节点和其两跳节点相连
      */
     private void transformTopology() {
+        //初始化各节点的所有数据结构
+        initState();
+
         List<Set<Integer>> tempAdjTable = new ArrayList<>();
         for (int i = 0; i < nodeCount; i++)
             tempAdjTable.add(new HashSet<>(adjTable.get(i)));
@@ -469,8 +489,8 @@ public class Graph {
         }
 
         System.out.println();
-        System.out.println("TransDelay: " + calTransDelay());
-        System.out.println("Total Transmission: " + calTotalTrans());
+        System.out.println("TransDelay: " + calTransDelay() + " slots");
+        System.out.println("Total Transmission: " + calTotalTrans() + " times");
     }
 
 
@@ -479,5 +499,17 @@ public class Graph {
     public static void main(String[] args) {
         Graph g = new Graph();
         g.getDetailedInfo();
+        System.out.println();
+        g.transformTopology();
+        g.getDetailedInfo();
+
+//        g.finalizeBackbone();
+//        System.out.println("TransDelay: " + g.calTransDelay());
+//        System.out.println("Total Transmission: " + g.calTotalTrans());
+//
+//        g.transformTopology();
+//        g.finalizeBackbone();
+//        System.out.println("TransDelay: " + g.calTransDelay());
+//        System.out.println("Total Transmission: " + g.calTotalTrans());
     }
 }
