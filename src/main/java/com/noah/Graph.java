@@ -16,8 +16,8 @@ public class Graph {
     private Graph() {
         backbone = new HashSet<>();
         maxLevel = 0;
-        //manuallyInit();
-        autoInit(35,4,40);
+        manuallyInit();
+        //autoInit(35,4,40);
         //transformTopology();
         calNodeLevel();
     }
@@ -272,7 +272,7 @@ public class Graph {
      */
     private void manuallyInit() {
         try {
-            Scanner sc = new Scanner(new FileInputStream("./src/main/resources/test_data(origin).txt"));
+            Scanner sc = new Scanner(new FileInputStream("./src/main/resources/test_data(new_1).txt"));
 
             //输入节点数和时隙数
             nodeCount = sc.nextInt();
@@ -311,7 +311,7 @@ public class Graph {
      * 随机生成图的拓扑结构（基于LBAS的一跳模型）
      * @param nodeNum 需要生成的节点数
      * @param slotNum 当前图每个周期中的时隙数
-     * @param additionalEdgeNum 最少生成的边数
+     * @param additionalEdgeNum 额外生成的边数
      */
     private void autoInit(int nodeNum, int slotNum, int additionalEdgeNum) {
         Random random = new Random(System.currentTimeMillis());
@@ -471,7 +471,6 @@ public class Graph {
         System.out.println();
         System.out.println("TransDelay: " + calTransDelay());
         System.out.println("Total Transmission: " + calTotalTrans());
-        System.out.println();
     }
 
 
