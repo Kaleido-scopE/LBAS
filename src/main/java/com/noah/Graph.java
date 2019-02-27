@@ -13,12 +13,25 @@ public class Graph {
     private List<Set<Integer>> adjTable;//描述图拓扑结构的邻接表，adjTable(i)表示编号为i的邻接点编号集合
     private Set<Integer> backbone;//广播骨架节点编号集合
 
+    /**
+     * 无参构造方法使用resource中的拓扑
+     */
     private Graph() {
         backbone = new HashSet<>();
         maxLevel = 0;
-        //manuallyInit();
-        autoInit(20,5,0);
-        //transformTopology();
+        manuallyInit();
+    }
+
+    /**
+     * 含参构造方法使用autoInit自动生成拓扑
+     * @param nodeNum 边数
+     * @param slotNum 时隙数
+     * @param additionalEdgeNum 在保证图连通性的基础上额外增加的边数
+     */
+    private Graph(int nodeNum, int slotNum, int additionalEdgeNum) {
+        backbone = new HashSet<>();
+        maxLevel = 0;
+        autoInit(nodeNum, slotNum, additionalEdgeNum);
     }
 
     /**
@@ -112,6 +125,7 @@ public class Graph {
             }
             nodeList[selectedId].getTransSet().add(timeSlot);//将当前时隙加入选中节点的传输时隙集合
         }
+
         return Ci;
     }
 
@@ -149,10 +163,14 @@ public class Graph {
 
     /**
      * 自上而下遍历，将各覆盖节点加入广播主干，并建立数棵覆盖子树
+     * 在使用了calNodeLevel后才能使用
      */
     private void constructSubTrees() {
-        //初始化各节点的层
+        //建立子树前需要重新计算各节点的Level，因为transformTopology更改了网络拓扑，同样也改变了各节点的Level
         calNodeLevel();
+
+//        for (Node n : nodeList)
+//            System.out.println(n.getId() + ": " + n.getParentId() + " " +n.getLevel());
 
         //列表中第i个集合对应第i个时隙的覆盖节点集合
         //同时可以计算各节点的覆盖节点
@@ -234,23 +252,25 @@ public class Graph {
         List<Node> rootNodes = getRootNodes();
         int covRoot, selectedC = -1;
         int P, grandP;
-        Set<Integer> neighbors;
+        Set<Integer> Nv, Nu;
 
         for (Node v : rootNodes) {
             covRoot = nodeList[v.getCovNodeId()].getRootId();
             if (nodeList[covRoot].getLevel().intValue() < v.getLevel().intValue())//Case 2.1
                 v.setParentId(v.getCovNodeId());
             else {
-                neighbors = adjTable.get(v.getId());
-                for (Integer c : neighbors) {
+                Nv = adjTable.get(v.getId());
+                for (Integer c : Nv) {
                     //Case 2.2 在v的邻节点中选择，其满足以下条件之一：
                     //1. 已经在主干中，且其根节点所在层比v低
                     //2. 覆盖它的节点所在子树的根节点所在层比v低
-                    if (backbone.contains(c) && nodeList[nodeList[c].getRootId()].getLevel() < v.getLevel() ||
-                            nodeList[nodeList[nodeList[c].getCovNodeId()].getRootId()].getLevel() < v.getLevel()) {
-                        selectedC = c;
-                        break;
-                    }
+                    //3. 该节点可以到达v***
+                    if (adjTable.get(c).contains(v.getId()))
+                        if (backbone.contains(c) && nodeList[nodeList[c].getRootId()].getLevel() < v.getLevel() ||
+                                nodeList[nodeList[nodeList[c].getCovNodeId()].getRootId()].getLevel() < v.getLevel()) {
+                            selectedC = c;
+                            break;
+                        }
                 }
                 if (selectedC != -1) {
                     v.setParentId(selectedC);
@@ -258,10 +278,27 @@ public class Graph {
                     selectedC = -1;
                 }
                 else {
-                    P = v.getParentId();
-                    grandP = nodeList[P].getParentId();
-                    addToBackBone2(grandP, nodeList[grandP].getCovNodeId(), nodeList[P].getActiveSlot());
-                    addToBackBone2(P, grandP, v.getActiveSlot());
+                    //增加回路检查
+                    //寻找一个connector u，u有一个邻居c，且Cov(c)的level比v的小
+                    //P(v)=u P(u)=c P(c)=Cov(c)
+                    boolean flag = false;
+                    for (Integer u : Nv)
+                        if (!flag && nodeList[u].getCoveringSet().isEmpty()) {
+                            Nu = adjTable.get(u);
+                            for (Integer c : Nu)
+                                if (!flag)
+                                    if (backbone.contains(c) && nodeList[c].getLevel() < v.getLevel() ||
+                                            nodeList[c].getCovNodeId().intValue() != u && nodeList[nodeList[c].getCovNodeId()].getLevel() < v.getLevel()) { //Cov(v)的level应小于v的level
+                                        addToBackBone2(c, nodeList[c].getCovNodeId(), nodeList[u].getActiveSlot());
+                                        addToBackBone2(u, c, v.getActiveSlot());
+                                        flag = true;
+                                    }
+                        }
+
+//                    P = v.getParentId();
+//                    grandP = nodeList[P].getParentId();
+//                    addToBackBone2(grandP, nodeList[grandP].getCovNodeId(), nodeList[P].getActiveSlot());
+//                    addToBackBone2(P, grandP, v.getActiveSlot());
                 }
             }
             v.setRootId(nodeList[v.getParentId()].getRootId());
@@ -274,7 +311,7 @@ public class Graph {
      */
     private void manuallyInit() {
         try {
-            Scanner sc = new Scanner(new FileInputStream("./src/main/resources/test_data(new_1).txt"));
+            Scanner sc = new Scanner(new FileInputStream("./src/main/resources/test_data(new_2).txt"));
 
             //输入节点数和时隙数
             nodeCount = sc.nextInt();
@@ -301,7 +338,7 @@ public class Graph {
                 s = sc.nextInt();
                 e = sc.nextInt();
                 adjTable.get(s).add(e);
-                adjTable.get(e).add(s);
+                //adjTable.get(e).add(s);
             }
 
         } catch (FileNotFoundException e) {
@@ -378,11 +415,20 @@ public class Graph {
     }
 
     /**
-     * 变换图的拓扑结构，将每个节点和其两跳节点相连
+     * 变换拓扑结构，将Level大于hotspotBorder的节点的广播半径加倍
+     * @param hotspotBorder 热点区域Level边界，从0开始计数
      */
-    private void transformTopology() {
+    private void transformTopology(int hotspotBorder) {
         //初始化各节点的所有数据结构
         initState();
+        calNodeLevel();
+
+        if (hotspotBorder > maxLevel)
+            try {
+                throw new Exception("Level Overflow!");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
         List<Set<Integer>> tempAdjTable = new ArrayList<>();
         for (int i = 0; i < nodeCount; i++)
@@ -391,9 +437,11 @@ public class Graph {
 
         for (int i = 0; i < nodeCount; i++) {
             curNeighbors = adjTable.get(i);
-            for (Integer j : curNeighbors)
-                tempAdjTable.get(i).addAll(adjTable.get(j));
-            tempAdjTable.get(i).remove(i);
+            if (nodeList[i].getLevel() > hotspotBorder) {
+                for (Integer j : curNeighbors)
+                    tempAdjTable.get(i).addAll(adjTable.get(j));
+                tempAdjTable.get(i).remove(i);
+            }
         }
 
         adjTable = tempAdjTable;
@@ -447,7 +495,7 @@ public class Graph {
             //当某节点在某个自己的传输时隙中广播时，注意到其邻节点中所有在当前时隙活跃的节点都能接收到信息，而不只是其覆盖节点
             for (Integer slot : nodeList[currentNode].getTransSet())
                 for (Integer neighborId : neighborSet)
-                    if (nodeList[neighborId].getActiveSlot() == slot) {
+                    if (nodeList[neighborId].getActiveSlot().intValue() == slot) {
                         currentTime = reachTime[currentNode] + slot - reachTime[currentNode] % slotCount;
                         if (reachTime[currentNode] % slotCount >= slot) {
                             currentTime += slotCount;
@@ -464,7 +512,12 @@ public class Graph {
 
         for (int time : reachTime)
             if (time > maxTime)
-                maxTime = time;//本短点可查看消息传送到各节点的时间
+                maxTime = time;//本断点可查看消息传送到各节点的时间
+
+        System.out.println();
+        System.out.println("Id\tReachTime");
+        for (int i = 0; i < reachTime.length; i++)
+            System.out.println(i + "\t" + reachTime[i]);
 
         return maxTime;
     }
@@ -479,6 +532,12 @@ public class Graph {
             System.out.println(n.getId()+ "\t" + n.getCovNodeId() + "\t" + n.getActiveSlot());
 
         System.out.println();
+        System.out.println("Id\tAdjTable");
+        for (Node n : nodeList) {
+            System.out.println(n.getId() + "\t" + adjTable.get(n.getId()));
+        }
+
+        System.out.println();
         System.out.println("Backbone:");
         System.out.println("Id\tParent\tTransSet\tCoveringSet");
         for (Integer i : backbone) {
@@ -489,27 +548,42 @@ public class Graph {
         }
 
         System.out.println();
+        System.out.println("All:");
+        System.out.println("Id\tParent\tLevel\tTransSet\tCoveringSet");
+        for (int i = 0; i < nodeCount; i++) {
+            System.out.print(i + "\t" + nodeList[i].getParentId() + "\t" + nodeList[i].getLevel() + "\t" + nodeList[i].getTransSet() + "\t[");
+            for (Node n : nodeList[i].getCoveringSet())
+                System.out.print(n.getId() + ",");
+            System.out.println("]");
+        }
+
+        System.out.println();
         System.out.println("TransDelay: " + calTransDelay() + " slots");
         System.out.println("Total Transmission: " + calTotalTrans() + " times");
     }
 
-
-
+    /**
+     * 传输延迟对比，需要使用含参构造方法
+     * @param nodeSize 网络中节点数
+     * @param slotSize 周期时隙数
+     * @param HSE 热点边缘
+     */
+    private static void transDelayCompare(int nodeSize, int slotSize, int HSE) {
+        Graph g = new Graph(nodeSize, slotSize, 5);
+        g.finalizeBackbone();
+        System.out.println("LBAS: " + g.calTransDelay());
+        g.transformTopology(HSE);
+        g.finalizeBackbone();
+        System.out.println("XXXXX: " + g.calTransDelay());
+    }
 
     public static void main(String[] args) {
+//        Graph g = new Graph(50, 5, 10);
+//        g.getDetailedInfo();
+//        System.out.println();
+//        g.transformTopology(3);
+//        g.getDetailedInfo();
         Graph g = new Graph();
         g.getDetailedInfo();
-        System.out.println();
-        g.transformTopology();
-        g.getDetailedInfo();
-
-//        g.finalizeBackbone();
-//        System.out.println("TransDelay: " + g.calTransDelay());
-//        System.out.println("Total Transmission: " + g.calTotalTrans());
-//
-//        g.transformTopology();
-//        g.finalizeBackbone();
-//        System.out.println("TransDelay: " + g.calTransDelay());
-//        System.out.println("Total Transmission: " + g.calTotalTrans());
     }
 }
